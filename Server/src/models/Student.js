@@ -1,33 +1,25 @@
 const { promisePool } = require('../config/db');
 
-// Helper function to generate student ID
-const generateStudentId = () => {
-    const year = new Date().getFullYear();
-    const random = Math.floor(1000 + Math.random() * 9000);
-    return `STU${year}${random}`;
-};
-
 // Student Model with all database operations
 const Student = {
     // Create a new student
     create: async (studentData) => {
-        const { firstName, lastName, email, password } = studentData;
-        const studentId = generateStudentId();
+        const { idNumber, firstName, lastName, email, password } = studentData;
         
         const query = `
-            INSERT INTO students (studentId, firstName, lastName, email, password) 
+            INSERT INTO students (idNumber, firstName, lastName, email, password) 
             VALUES (?, ?, ?, ?, ?)
         `;
         
         const [result] = await promisePool.query(query, [
-            studentId,
+            idNumber,
             firstName,
             lastName,
             email,
             password
         ]);
         
-        return { id: result.insertId, studentId, ...studentData };
+        return { id: result.insertId, idNumber, ...studentData };
     },
 
     // Get all students with optional search
@@ -36,7 +28,7 @@ const Student = {
         const params = [];
         
         if (search) {
-            query += ` WHERE firstName LIKE ? OR lastName LIKE ? OR email LIKE ? OR studentId LIKE ?`;
+            query += ` WHERE idNumber LIKE ? OR firstName LIKE ? OR lastName LIKE ? OR email LIKE ?`;
             const searchPattern = `%${search}%`;
             params.push(searchPattern, searchPattern, searchPattern, searchPattern);
         }
@@ -56,11 +48,11 @@ const Student = {
         return rows[0] || null;
     },
 
-    // Find student by studentId
-    findByStudentId: async (studentId) => {
+    // Find student by idNumber
+    findByIdNumber: async (idNumber) => {
         const [rows] = await promisePool.query(
-            'SELECT * FROM students WHERE studentId = ?',
-            [studentId]
+            'SELECT * FROM students WHERE idNumber = ?',
+            [idNumber]
         );
         return rows[0] || null;
     },
@@ -76,10 +68,10 @@ const Student = {
 
     // Update student
     update: async (id, studentData) => {
-        const { firstName, lastName, email, password } = studentData;
+        const { idNumber, firstName, lastName, email, password } = studentData;
         
-        let query = 'UPDATE students SET firstName = ?, lastName = ?, email = ?';
-        const params = [firstName, lastName, email];
+        let query = 'UPDATE students SET idNumber = ?, firstName = ?, lastName = ?, email = ?';
+        const params = [idNumber, firstName, lastName, email];
         
         if (password) {
             query += ', password = ?';

@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './App.css'
 import Home from './page/Home'
 import Login from './page/Login'
-import AdminDashboard from './page/Admin/Dashboard'
+import AdminDashboard from './page/Admin/AdminDashboard'
 import StudentDashboard from './page/Student/Dashboard'
 import Notfound from './page/NotFound'
 function App() {

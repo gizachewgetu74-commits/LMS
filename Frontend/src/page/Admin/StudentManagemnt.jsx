@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 
-// API Base URL - change this to your server URL
+// API Base URL
 const API_URL = 'http://localhost:5000/api/students'
 
 function StudentManagement() {
@@ -13,6 +13,7 @@ function StudentManagement() {
   const [editingStudent, setEditingStudent] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [newStudent, setNewStudent] = useState({
+    idNumber: '',
     firstName: '',
     lastName: '',
     email: '',
@@ -46,44 +47,45 @@ function StudentManagement() {
     return `${firstName.toLowerCase()}#${randomDigits}`
   }
 
-// እና handleAddStudent ውስጥ ያለውን ስህተት ለማየት
-const handleAddStudent = async (e) => {
-  e.preventDefault();
-  
-  if (!newStudent.firstName || !newStudent.lastName || !newStudent.email) {
-    alert('Please fill in all required fields');
-    return;
-  }
+  const handleAddStudent = async (e) => {
+    e.preventDefault()
+    
+    if (!newStudent.idNumber || !newStudent.firstName || !newStudent.lastName || !newStudent.email) {
+      alert('Please fill in all required fields')
+      return
+    }
 
-  if (!newStudent.email.includes('@')) {
-    alert('Please enter a valid email address');
-    return;
-  }
+    if (!newStudent.email.includes('@')) {
+      alert('Please enter a valid email address')
+      return
+    }
 
-  try {
-    console.log('📤 Sending data:', newStudent);
-    const response = await axios.post(API_URL, {
-      firstName: newStudent.firstName,
-      lastName: newStudent.lastName,
-      email: newStudent.email,
-      password: newStudent.password || generatePassword(newStudent.firstName)
-    });
-    console.log('📥 Response:', response.data);
+    try {
+      console.log('📤 Sending data:', newStudent)
+      const response = await axios.post(API_URL, {
+        idNumber: newStudent.idNumber,
+        firstName: newStudent.firstName,
+        lastName: newStudent.lastName,
+        email: newStudent.email,
+        password: newStudent.password || generatePassword(newStudent.firstName)
+      })
+      console.log('📥 Response:', response.data)
 
-    alert(`Student added successfully!\nPassword: ${response.data.generatedPassword}`);
-    setNewStudent({ firstName: '', lastName: '', email: '', password: '' });
-    setShowAddForm(false);
-    fetchStudents();
-  } catch (error) {
-    console.error('❌ Error details:', error);
-    console.error('Response:', error.response?.data);
-    alert(error.response?.data?.message || 'Failed to add student');
+      alert(`Student added successfully!\nPassword: ${response.data.generatedPassword}`)
+      setNewStudent({ idNumber: '', firstName: '', lastName: '', email: '', password: '' })
+      setShowAddForm(false)
+      fetchStudents()
+    } catch (error) {
+      console.error('❌ Error details:', error)
+      console.error('Response:', error.response?.data)
+      alert(error.response?.data?.message || 'Failed to add student')
+    }
   }
-};
 
   const handleEditStudent = (student) => {
     setEditingStudent(student)
     setNewStudent({
+      idNumber: student.idNumber,
       firstName: student.firstName,
       lastName: student.lastName,
       email: student.email,
@@ -95,12 +97,11 @@ const handleAddStudent = async (e) => {
   const handleUpdateStudent = async (e) => {
     e.preventDefault()
     
-    if (!newStudent.firstName || !newStudent.lastName || !newStudent.email) {
+    if (!newStudent.idNumber || !newStudent.firstName || !newStudent.lastName || !newStudent.email) {
       alert('Please fill in all required fields')
       return
     }
 
-    // Validate email format
     if (!newStudent.email.includes('@')) {
       alert('Please enter a valid email address')
       return
@@ -108,23 +109,23 @@ const handleAddStudent = async (e) => {
 
     try {
       const updateData = {
+        idNumber: newStudent.idNumber,
         firstName: newStudent.firstName,
         lastName: newStudent.lastName,
         email: newStudent.email,
       }
 
-      // Only include password if it's provided
       if (newStudent.password) {
         updateData.password = newStudent.password
       }
 
-      await axios.put(`${API_URL}/${editingStudent._id}`, updateData)
+      await axios.put(`${API_URL}/${editingStudent.id}`, updateData)
       
       alert('Student updated successfully!')
       setEditingStudent(null)
-      setNewStudent({ firstName: '', lastName: '', email: '', password: '' })
+      setNewStudent({ idNumber: '', firstName: '', lastName: '', email: '', password: '' })
       setShowEditForm(false)
-      fetchStudents() // Refresh the list
+      fetchStudents()
     } catch (error) {
       alert(error.response?.data?.message || 'Failed to update student')
     }
@@ -136,7 +137,7 @@ const handleAddStudent = async (e) => {
     try {
       await axios.delete(`${API_URL}/${id}`)
       alert('Student deleted successfully!')
-      fetchStudents() // Refresh the list
+      fetchStudents()
     } catch (error) {
       alert(error.response?.data?.message || 'Failed to delete student')
     }
@@ -146,18 +147,18 @@ const handleAddStudent = async (e) => {
     try {
       const response = await axios.put(`${API_URL}/${id}/regenerate-password`)
       alert(`New password for ${response.data.data.firstName}: ${response.data.newPassword}`)
-      fetchStudents() // Refresh the list
+      fetchStudents()
     } catch (error) {
       alert(error.response?.data?.message || 'Failed to regenerate password')
     }
   }
 
-  // Filter students based on search (client-side filtering)
+  // Filter students based on search
   const filteredStudents = students.filter(student => 
+    student.idNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     student.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     student.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    student.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    student.studentId?.toLowerCase().includes(searchTerm.toLowerCase())
+    student.email?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   return (
@@ -193,10 +194,20 @@ const handleAddStudent = async (e) => {
               <h3><i className="fas fa-user-plus"></i> Add New Student</h3>
               <button className="close-btn" onClick={() => {
                 setShowAddForm(false)
-                setNewStudent({ firstName: '', lastName: '', email: '', password: '' })
+                setNewStudent({ idNumber: '', firstName: '', lastName: '', email: '', password: '' })
               }}>×</button>
             </div>
             <form onSubmit={handleAddStudent}>
+              <div className="form-group">
+                <label>ID Number *</label>
+                <input
+                  type="text"
+                  placeholder="Enter ID number"
+                  value={newStudent.idNumber}
+                  onChange={(e) => setNewStudent({...newStudent, idNumber: e.target.value})}
+                  required
+                />
+              </div>
               <div className="form-row">
                 <div className="form-group">
                   <label>First Name *</label>
@@ -245,7 +256,7 @@ const handleAddStudent = async (e) => {
               <div className="modal-actions">
                 <button type="button" className="cancel-btn" onClick={() => {
                   setShowAddForm(false)
-                  setNewStudent({ firstName: '', lastName: '', email: '', password: '' })
+                  setNewStudent({ idNumber: '', firstName: '', lastName: '', email: '', password: '' })
                 }}>Cancel</button>
                 <button type="submit" className="submit-btn">
                   <i className="fas fa-save"></i> Add Student
@@ -265,10 +276,20 @@ const handleAddStudent = async (e) => {
               <button className="close-btn" onClick={() => {
                 setShowEditForm(false)
                 setEditingStudent(null)
-                setNewStudent({ firstName: '', lastName: '', email: '', password: '' })
+                setNewStudent({ idNumber: '', firstName: '', lastName: '', email: '', password: '' })
               }}>×</button>
             </div>
             <form onSubmit={handleUpdateStudent}>
+              <div className="form-group">
+                <label>ID Number *</label>
+                <input
+                  type="text"
+                  placeholder="Enter ID number"
+                  value={newStudent.idNumber}
+                  onChange={(e) => setNewStudent({...newStudent, idNumber: e.target.value})}
+                  required
+                />
+              </div>
               <div className="form-row">
                 <div className="form-group">
                   <label>First Name *</label>
@@ -318,7 +339,7 @@ const handleAddStudent = async (e) => {
                 <button type="button" className="cancel-btn" onClick={() => {
                   setShowEditForm(false)
                   setEditingStudent(null)
-                  setNewStudent({ firstName: '', lastName: '', email: '', password: '' })
+                  setNewStudent({ idNumber: '', firstName: '', lastName: '', email: '', password: '' })
                 }}>Cancel</button>
                 <button type="submit" className="submit-btn">
                   <i className="fas fa-save"></i> Update Student
@@ -334,7 +355,7 @@ const handleAddStudent = async (e) => {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Student ID</th>
+              <th>ID Number</th>
               <th>First Name</th>
               <th>Last Name</th>
               <th>Email</th>
@@ -345,8 +366,8 @@ const handleAddStudent = async (e) => {
           <tbody>
             {filteredStudents.length > 0 ? (
               filteredStudents.map(student => (
-                <tr key={student._id || student.id}>
-                  <td><strong>{student.studentId}</strong></td>
+                <tr key={student.id}>
+                  <td><strong>{student.idNumber}</strong></td>
                   <td>{student.firstName}</td>
                   <td>{student.lastName}</td>
                   <td>{student.email}</td>
@@ -365,14 +386,14 @@ const handleAddStudent = async (e) => {
                     </button>
                     <button 
                       className="password-btn"
-                      onClick={() => handleRegeneratePassword(student._id || student.id)}
+                      onClick={() => handleRegeneratePassword(student.id)}
                       title="Regenerate Password"
                     >
                       <i className="fas fa-key"></i>
                     </button>
                     <button 
                       className="delete-btn"
-                      onClick={() => handleDeleteStudent(student._id || student.id)}
+                      onClick={() => handleDeleteStudent(student.id)}
                       title="Delete Student"
                     >
                       <i className="fas fa-trash"></i>

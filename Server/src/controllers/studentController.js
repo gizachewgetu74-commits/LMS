@@ -57,13 +57,13 @@ const getStudentById = async (req, res) => {
 // Create new student
 const createStudent = async (req, res) => {
     try {
-        const { firstName, lastName, email, password } = req.body;
+        const { idNumber, firstName, lastName, email, password } = req.body;
         
         // Validate required fields
-        if (!firstName || !lastName || !email) {
+        if (!idNumber || !firstName || !lastName || !email) {
             return res.status(400).json({
                 success: false,
-                message: 'Please provide firstName, lastName, and email'
+                message: 'Please provide idNumber, firstName, lastName, and email'
             });
         }
         
@@ -72,6 +72,15 @@ const createStudent = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'Please provide a valid email address'
+            });
+        }
+        
+        // Check if idNumber already exists
+        const existingByIdNumber = await Student.findByIdNumber(idNumber);
+        if (existingByIdNumber) {
+            return res.status(409).json({
+                success: false,
+                message: 'Student with this ID number already exists'
             });
         }
         
@@ -89,6 +98,7 @@ const createStudent = async (req, res) => {
         
         // Create student
         const newStudent = await Student.create({
+            idNumber,
             firstName,
             lastName,
             email,
@@ -99,7 +109,7 @@ const createStudent = async (req, res) => {
             success: true,
             message: 'Student created successfully',
             data: newStudent,
-            generatedPassword: finalPassword // Send back the password for display
+            generatedPassword: finalPassword
         });
     } catch (error) {
         console.error('Error creating student:', error);
@@ -115,7 +125,7 @@ const createStudent = async (req, res) => {
 const updateStudent = async (req, res) => {
     try {
         const { id } = req.params;
-        const { firstName, lastName, email, password } = req.body;
+        const { idNumber, firstName, lastName, email, password } = req.body;
         
         // Check if student exists
         const existingStudent = await Student.findById(id);
@@ -124,6 +134,17 @@ const updateStudent = async (req, res) => {
                 success: false,
                 message: 'Student not found'
             });
+        }
+        
+        // Check if idNumber is taken by another student
+        if (idNumber && idNumber !== existingStudent.idNumber) {
+            const studentWithIdNumber = await Student.findByIdNumber(idNumber);
+            if (studentWithIdNumber && studentWithIdNumber.id !== parseInt(id)) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'ID number is already taken by another student'
+                });
+            }
         }
         
         // Check if email is taken by another student
@@ -139,6 +160,7 @@ const updateStudent = async (req, res) => {
         
         // Prepare update data
         const updateData = {
+            idNumber: idNumber || existingStudent.idNumber,
             firstName: firstName || existingStudent.firstName,
             lastName: lastName || existingStudent.lastName,
             email: email || existingStudent.email,
@@ -205,7 +227,7 @@ const regeneratePassword = async (req, res) => {
             newPassword: newPassword,
             data: {
                 id: student.id,
-                studentId: student.studentId,
+                idNumber: student.idNumber,
                 firstName: student.firstName,
                 lastName: student.lastName
             }
@@ -248,7 +270,7 @@ const deleteStudent = async (req, res) => {
             message: 'Student deleted successfully',
             data: {
                 id: student.id,
-                studentId: student.studentId,
+                idNumber: student.idNumber,
                 firstName: student.firstName,
                 lastName: student.lastName
             }
