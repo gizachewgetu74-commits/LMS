@@ -8,59 +8,57 @@ function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault()
     setError('')
 
-    // Simple validation
     if (!email || !password) {
       setError('Please fill in all fields')
       return
     }
 
-    // Sample user credentials
-    const users = [
-      {
-        email: 'abey@gmail.com',
-        password: '12345678',
-        role: 'student'
-      },
-      {
-        email: 'gizachew@gmail.com',
-        password: '12345678',
-        role: 'admin'
-      }
-    ]
+    setLoading(true)
 
-    // Check if user exists
-    const user = users.find(u => u.email === email && u.password === password)
-
-    if (user) {
-      // Store user role and email in localStorage
-      localStorage.setItem('userRole', user.role)
-      localStorage.setItem('userEmail', user.email)
-      
-      // Navigate to appropriate dashboard
-      if (user.role === 'student') {
-        navigate('/student-dashboard')
-      } else if (user.role === 'admin') {
+    try {
+      // 🔑 Admin login (still hardcoded — or move to backend later)
+      if (email === 'gizachew@gmail.com' && password === '12345678') {
+        localStorage.setItem('userRole', 'admin')
+        localStorage.setItem('userEmail', email)
         navigate('/admin-dashboard')
+        return
       }
-    } else {
-      // Check if email exists but password is wrong
-      const userExists = users.find(u => u.email === email)
-      if (userExists) {
-        setError('Invalid password. Please try again.')
-      } else {
-        setError('Invalid email or password. Please try again.')
+
+      // 🎓 Student login — hit the backend
+      const res = await fetch('http://localhost:5000/api/students/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      })
+
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        setError(data.message || 'Invalid email or password')
+        return
       }
+
+      // Save student info for the dashboard
+      localStorage.setItem('userRole', 'student')
+      localStorage.setItem('userEmail', data.user.email)
+      localStorage.setItem('student', JSON.stringify(data.user))
+
+      navigate('/student-dashboard')
+    } catch (err) {
+      console.error(err)
+      setError('Cannot connect to server. Please try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleBackToHome = () => {
-    navigate('/')
-  }
+  const handleBackToHome = () => navigate('/')
 
   return (
     <div className="login-container">
@@ -73,7 +71,7 @@ function Login() {
 
         <form onSubmit={handleLogin} className="login-form">
           {error && <div className="error-message">{error}</div>}
-          
+
           <div className="form-group">
             <label>Email Address</label>
             <input
@@ -96,13 +94,18 @@ function Login() {
             />
           </div>
 
-          <button type="submit" className="login-btn student-btn">
-            <i className="fas fa-sign-in-alt"></i> Login
+          <button
+            type="submit"
+            className="login-btn student-btn"
+            disabled={loading}
+          >
+            <i className="fas fa-sign-in-alt"></i>
+            {loading ? ' Logging in...' : ' Login'}
           </button>
 
-          <button 
-            type="button" 
-            onClick={handleBackToHome} 
+          <button
+            type="button"
+            onClick={handleBackToHome}
             className="back-btn"
           >
             ← Back to Home

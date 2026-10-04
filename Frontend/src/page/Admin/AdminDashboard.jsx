@@ -3,6 +3,10 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import StudentManagement from './StudentManagemnt'
 import BookManagement from './BookManagement'
+import BorrowRequests from './BorrowRequests'
+import './AdminDashboard.css'
+
+const API = 'http://localhost:5000/api'
 
 function AdminDashboard({ onLogout }) {
   const [activeTab, setActiveTab] = useState('overview')
@@ -11,181 +15,154 @@ function AdminDashboard({ onLogout }) {
     totalMembers: 0,
     booksBorrowed: 0,
     overdue: 0,
+    pendingRequests: 0,
   })
   const [loading, setLoading] = useState(true)
   const [recentActivity, setRecentActivity] = useState([])
+  const [pendingCount, setPendingCount] = useState(0)
 
   // Fetch dashboard stats
   const fetchStats = async () => {
     try {
       setLoading(true)
-      
-      // Fetch book stats
-      const bookStatsResponse = await axios.get('http://localhost:5000/api/books/stats')
-      const bookStats = bookStatsResponse.data.data
-      
-      // Fetch student count
-      const studentsResponse = await axios.get('http://localhost:5000/api/students')
-      const totalMembers = studentsResponse.data.count || 0
-      
-      // Update stats with real data
+
+      const [bookStatsRes, studentsRes, requestsRes] = await Promise.all([
+        axios.get(`${API}/books/stats`),
+        axios.get(`${API}/students`),
+        axios.get(`${API}/borrows`).catch(() => ({ data: { data: [] } })),
+      ])
+
+      const bookStats = bookStatsRes.data.data
+      const totalMembers = studentsRes.data.count || 0
+      const allRequests = requestsRes.data.data || []
+      const pending = allRequests.filter(r => r.status === 'pending').length
+      const approved = allRequests.filter(r => r.status === 'approved').length
+
+      setPendingCount(pending)
       setStats({
         totalBooks: bookStats.totalBooks || 0,
-        totalMembers: totalMembers,
-        booksBorrowed: bookStats.totalBooks - bookStats.availableBooks || 0,
-        overdue: 0, // Will implement later with borrowing system
+        totalMembers,
+        booksBorrowed: approved,
+        overdue: 0,
+        pendingRequests: pending,
       })
-      
-      // Generate recent activity (will be replaced with real data later)
-      generateRecentActivity()
-      
+
+      generateRecentActivity(allRequests)
     } catch (error) {
       console.error('Error fetching stats:', error)
-      // Fallback to default values if API fails
-      setStats({
-        totalBooks: 0,
-        totalMembers: 0,
-        booksBorrowed: 0,
-        overdue: 0,
-      })
     } finally {
       setLoading(false)
     }
   }
 
-  // Generate recent activity (placeholder - will be replaced with real activity data)
-  const generateRecentActivity = async () => {
+  // Build recent activity feed
+  const generateRecentActivity = async (requests = []) => {
     try {
-      // Fetch recent students
-      const studentsResponse = await axios.get('http://localhost:5000/api/students')
-      const recentStudents = studentsResponse.data.data?.slice(0, 3) || []
-      
-      // Fetch recent books
-      const booksResponse = await axios.get('http://localhost:5000/api/books')
-      const recentBooks = booksResponse.data.data?.slice(0, 2) || []
-      
-      // Create activity items
-      const activities = []
-      
-      // Add student registrations
-      recentStudents.forEach((student, index) => {
-        activities.push({
-          id: `student-${index}`,
-          user: `${student.firstName} ${student.lastName}`,
-          action: `Registered as new student (ID: ${student.idNumber})`,
-          time: new Date(student.createdAt).toLocaleString(),
-          type: 'student'
-        })
-      })
-      
-      // Add book additions
-      recentBooks.forEach((book, index) => {
-        activities.push({
-          id: `book-${index}`,
-          user: 'System',
-          action: `Added new book: "${book.title}" by ${book.author}`,
-          time: new Date(book.createdAt).toLocaleString(),
-          type: 'book'
-        })
-      })
-      
-      // Sort by time (newest first)
-      activities.sort((a, b) => new Date(b.time) - new Date(a.time))
-      
-      setRecentActivity(activities.slice(0, 5)) // Show latest 5 activities
-      
-    } catch (error) {
-      console.error('Error generating activity:', error)
-      // Set default activities
-      setRecentActivity([
-        { id: 1, user: 'System', action: 'Dashboard loaded', time: new Date().toLocaleString(), type: 'system' }
+      const [studentsRes, booksRes] = await Promise.all([
+        axios.get(`${API}/students`),
+        axios.get(`${API}/books`),
       ])
+
+      const recentStudents = studentsRes.data.data?.slice(0, 3) || []
+      const recentBooks = booksRes.data.data?.slice(0, 2) || []
+
+      const activities = []
+
+      recentStudents.forEach((s, i) => {
+        activities.push({
+          id: `student-${i}`,
+          user: `${s.firstName} ${s.lastName}`,
+          action: `Registered as new student (ID: ${s.idNumber})`,
+          time: s.createdAt ? new Date(s.createdAt).toLocaleString() : 'Recently',
+          type: 'student',
+        })
+      })
+
+      recentBooks.forEach((b, i) => {
+        activities.push({
+          id: `book-${i}`,
+          user: 'System',
+          action: `Added new book: "${b.title}" by ${b.author}`,
+          time: b.createdAt ? new Date(b.createdAt).toLocaleString() : 'Recently',
+          type: 'book',
+        })
+      })
+
+      requests.slice(0, 3).forEach((r, i) => {
+        activities.push({
+          id: `req-${i}`,
+          user: `${r.firstName || 'Student'} ${r.lastName || ''}`.trim(),
+          action: `Requested "${r.title}" — status: ${r.status}`,
+          time: r.requested_at ? new Date(r.requested_at).toLocaleString() : 'Recently',
+          type: 'borrow',
+        })
+      })
+
+      activities.sort((a, b) => new Date(b.time) - new Date(a.time))
+      setRecentActivity(activities.slice(0, 6))
+    } catch (err) {
+      console.error(err)
     }
   }
 
-  // Auto-refresh stats every 30 seconds
   useEffect(() => {
     fetchStats()
-    
-    const interval = setInterval(() => {
-      fetchStats()
-    }, 30000) // Refresh every 30 seconds
-    
+    const interval = setInterval(fetchStats, 30000)
     return () => clearInterval(interval)
   }, [])
 
-  // Render content based on active tab
   const renderContent = () => {
-    switch(activeTab) {
+    switch (activeTab) {
       case 'students':
         return <StudentManagement />
       case 'books':
         return <BookManagement />
+      case 'requests':
+        return <BorrowRequests onUpdate={fetchStats} />
       default:
         return (
           <>
             {/* Stats Grid */}
             <div className="stats-grid">
-              <div className="stat-card">
-                <i className="fas fa-book"></i>
-                <span className="stat-number">{loading ? '...' : stats.totalBooks}</span>
-                <span className="stat-label">Total Books</span>
-              </div>
-              <div className="stat-card">
-                <i className="fas fa-users"></i>
-                <span className="stat-number">{loading ? '...' : stats.totalMembers}</span>
-                <span className="stat-label">Total Members</span>
-              </div>
-              <div className="stat-card">
-                <i className="fas fa-handshake"></i>
-                <span className="stat-number">{loading ? '...' : stats.booksBorrowed}</span>
-                <span className="stat-label">Books Borrowed</span>
-              </div>
-              <div className="stat-card">
-                <i className="fas fa-exclamation-triangle"></i>
-                <span className="stat-number">{loading ? '...' : stats.overdue}</span>
-                <span className="stat-label">Overdue Books</span>
-              </div>
+              <StatCard
+                icon="fa-book"
+                value={stats.totalBooks}
+                label="Total Books"
+                color="blue"
+                loading={loading}
+              />
+              <StatCard
+                icon="fa-users"
+                value={stats.totalMembers}
+                label="Total Members"
+                color="green"
+                loading={loading}
+              />
+              <StatCard
+                icon="fa-handshake"
+                value={stats.booksBorrowed}
+                label="Books Borrowed"
+                color="orange"
+                loading={loading}
+              />
+              <StatCard
+                icon="fa-hourglass-half"
+                value={stats.pendingRequests}
+                label="Pending Requests"
+                color="purple"
+                loading={loading}
+              />
             </div>
 
-            {/* Recent Activity Panel */}
+            {/* Recent Activity */}
             <div className="panel-row">
               <div className="panel">
-                <h3><i className="fas fa-clock"></i> Recent Activity</h3>
-                {loading ? (
-                  <div className="loading-state">
-                    <i className="fas fa-spinner fa-spin"></i> Loading activities...
-                  </div>
-                ) : (
-                  <div className="activity-list">
-                    {recentActivity.length > 0 ? (
-                      recentActivity.map(activity => (
-                        <div key={activity.id} className="activity-item">
-                          <div className="activity-info">
-                            <span className="activity-user">
-                              {activity.type === 'student' && <i className="fas fa-user-graduate"></i>}
-                              {activity.type === 'book' && <i className="fas fa-book"></i>}
-                              {activity.type === 'system' && <i className="fas fa-cog"></i>}
-                              {activity.user}
-                            </span>
-                            <span className="activity-action">{activity.action}</span>
-                          </div>
-                          <span className="activity-time">{activity.time}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="no-activity">
-                        <i className="fas fa-inbox"></i>
-                        <p>No recent activity</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                {/* Refresh button */}
-                <div className="panel-footer">
-                  <button 
-                    className="refresh-btn-small" 
+                <div className="panel-header">
+                  <h3>
+                    <i className="fas fa-clock"></i> Recent Activity
+                  </h3>
+                  <button
+                    className="refresh-btn-small"
                     onClick={fetchStats}
                     disabled={loading}
                   >
@@ -193,6 +170,37 @@ function AdminDashboard({ onLogout }) {
                     {loading ? ' Refreshing...' : ' Refresh'}
                   </button>
                 </div>
+
+                {loading ? (
+                  <div className="loading-state">
+                    <i className="fas fa-spinner fa-spin"></i> Loading activities...
+                  </div>
+                ) : recentActivity.length > 0 ? (
+                  <div className="activity-list">
+                    {recentActivity.map((a) => (
+                      <div key={a.id} className={`activity-item ${a.type}`}>
+                        <div className={`activity-icon ${a.type}`}>
+                          <i className={`fas ${
+                            a.type === 'student' ? 'fa-user-graduate'
+                            : a.type === 'book' ? 'fa-book'
+                            : a.type === 'borrow' ? 'fa-handshake'
+                            : 'fa-cog'
+                          }`}></i>
+                        </div>
+                        <div className="activity-info">
+                          <span className="activity-user">{a.user}</span>
+                          <span className="activity-action">{a.action}</span>
+                        </div>
+                        <span className="activity-time">{a.time}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="no-activity">
+                    <i className="fas fa-inbox"></i>
+                    <p>No recent activity</p>
+                  </div>
+                )}
               </div>
             </div>
           </>
@@ -213,31 +221,41 @@ function AdminDashboard({ onLogout }) {
       </header>
 
       <div className="admin-tabs">
-        <button 
-          className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
-          onClick={() => setActiveTab('overview')}
-        >
-          <i className="fas fa-chart-pie"></i> Overview
-        </button>
-        <button 
-          className={`tab-btn ${activeTab === 'students' ? 'active' : ''}`}
-          onClick={() => setActiveTab('students')}
-        >
-          <i className="fas fa-user-graduate"></i> Student Management
-        </button>
-        <button 
-          className={`tab-btn ${activeTab === 'books' ? 'active' : ''}`}
-          onClick={() => setActiveTab('books')}
-        >
-          <i className="fas fa-book"></i> Book Management
-        </button>
+        <TabButton active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} icon="fa-chart-pie" label="Overview" />
+        <TabButton active={activeTab === 'students'} onClick={() => setActiveTab('students')} icon="fa-user-graduate" label="Students" />
+        <TabButton active={activeTab === 'books'} onClick={() => setActiveTab('books')} icon="fa-book" label="Books" />
+        <TabButton
+          active={activeTab === 'requests'}
+          onClick={() => setActiveTab('requests')}
+          icon="fa-handshake"
+          label="Borrow Requests"
+          badge={pendingCount}
+        />
       </div>
 
-      <div className="dashboard-content">
-        {renderContent()}
-      </div>
+      <div className="dashboard-content">{renderContent()}</div>
     </div>
   )
 }
+
+/* ---------- Small components ---------- */
+const StatCard = ({ icon, value, label, color, loading }) => (
+  <div className={`stat-card ${color}`}>
+    <div className="stat-icon">
+      <i className={`fas ${icon}`}></i>
+    </div>
+    <div className="stat-body">
+      <span className="stat-number">{loading ? '…' : value}</span>
+      <span className="stat-label">{label}</span>
+    </div>
+  </div>
+)
+
+const TabButton = ({ active, onClick, icon, label, badge }) => (
+  <button className={`tab-btn ${active ? 'active' : ''}`} onClick={onClick}>
+    <i className={`fas ${icon}`}></i> {label}
+    {badge > 0 && <span className="tab-badge">{badge}</span>}
+  </button>
+)
 
 export default AdminDashboard

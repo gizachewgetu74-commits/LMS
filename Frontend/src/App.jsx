@@ -4,8 +4,9 @@ import './App.css'
 import Home from './page/Home'
 import Login from './page/Login'
 import AdminDashboard from './page/Admin/AdminDashboard'
-import StudentDashboard from './page/Student/Dashboard'
 import Notfound from './page/NotFound'
+import StudentDashboard from './page/Student/StudentDashboard'
+
 function App() {
   const userRole = localStorage.getItem('userRole')
 
@@ -22,14 +23,8 @@ function App() {
             <Navigate to="/login" />
           } 
         />
-        <Route 
-          path="/student-dashboard" 
-          element={
-            userRole === 'student' ? 
-            <StudentDashboard /> : 
-            <Navigate to="/login" />
-          } 
-        />
+        <Route path="/student-dashboard" element={<StudentDashboard />} />
+
         <Route path="*" element={<Notfound />} />
       </Routes>
     </BrowserRouter>

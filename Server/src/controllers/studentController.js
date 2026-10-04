@@ -285,11 +285,65 @@ const deleteStudent = async (req, res) => {
     }
 };
 
+// Login student
+const loginStudent = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        // Validate required fields
+        if (!email || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide email and password'
+            });
+        }
+
+        // Find student by email
+        const student = await Student.findByEmail(email);
+        if (!student) {
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid email or password'
+            });
+        }
+
+        // Check password (plain text for now — see security note below)
+        if (student.password !== password) {
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid email or password'
+            });
+        }
+
+        // Success — don't send password back
+        res.status(200).json({
+            success: true,
+            message: 'Login successful',
+            user: {
+                id: student.id,
+                idNumber: student.idNumber,
+                firstName: student.firstName,
+                lastName: student.lastName,
+                email: student.email,
+                role: 'student'
+            }
+        });
+    } catch (error) {
+        console.error('Error logging in:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Login failed',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     getStudents,
     getStudentById,
     createStudent,
     updateStudent,
     regeneratePassword,
-    deleteStudent
+    deleteStudent,
+    loginStudent
 };

@@ -6,6 +6,7 @@ const { connectDB, promisePool } = require("./src/config/db");
 // Import routes
 const studentRoutes = require("./src/routes/studentRoutes");
 const bookRoutes = require("./src/routes/bookRoutes");
+const borrowRoutes = require("./src/routes/borrowRoutes");
 
 dotenv.config();
 
@@ -39,19 +40,15 @@ const startServer = async () => {
         });
 
         // ============ API Routes ============
-        
-
-        // Student routes (CRUD operations)
         app.use("/api/students", studentRoutes);
-
-        // Book routes (CRUD operations with search, filter, stats)
         app.use("/api/books", bookRoutes);
+        app.use("/api/borrows", borrowRoutes);   // ✅ fixed path
 
         // ============ API Endpoints Summary ============
         console.log("\n📚 API Endpoints:");
-        console.log(`   🔐 Auth:     http://localhost:5000/api/auth`);
         console.log(`   👨‍🎓 Students: http://localhost:5000/api/students`);
         console.log(`   📖 Books:    http://localhost:5000/api/books`);
+        console.log(`   🔄 Borrows:  http://localhost:5000/api/borrows`);
 
         const PORT = process.env.PORT || 5000;
         app.listen(PORT, () => {
